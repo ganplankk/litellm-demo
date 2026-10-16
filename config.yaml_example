@@ -1,0 +1,8 @@
+model_list:
+  - model_name: claude-lab
+    litellm_params:
+      model: os.environ/BEDROCK_MODEL
+      aws_region_name: os.environ/AWS_REGION_NAME
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

@@ -1,0 +1,44 @@
+name: litellm-local-lab
+
+services:
+  litellm:
+    image: ${LITELLM_IMAGE:?Run python3 scripts/init_env.py first}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${LITELLM_PORT:-4000}:4000"
+    env_file:
+      - .aws.env
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?Required}
+      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:?Required}
+      UI_USERNAME: admin
+      UI_PASSWORD: ${UI_PASSWORD:?Required}
+      DATABASE_URL: postgresql://litellm:${POSTGRES_PASSWORD:?Required}@postgres:5432/litellm
+      STORE_MODEL_IN_DB: "True"
+      AWS_REGION_NAME: ${AWS_REGION_NAME:?Required}
+      BEDROCK_MODEL: ${BEDROCK_MODEL:?Required}
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: ${POSTGRES_IMAGE:?Run python3 scripts/init_env.py first}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: litellm
+      POSTGRES_DB: litellm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm -d litellm"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  postgres_data:

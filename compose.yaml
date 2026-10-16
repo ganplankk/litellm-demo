@@ -1,0 +1,54 @@
+name: litellm-manual-lab
+
+services:
+## litellm
+  litellm:
+    image: docker.litellm.ai/berriai/litellm:main-stable
+    
+    env_file:
+      - .aws.env
+
+    ports:
+      - "127.0.0.1:4000:4000"
+
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?Set LITELLM_MASTER_KEY}
+      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:?Set LITELLM_SALT_KEY}
+      UI_USERNAME: admin
+      UI_PASSWORD: ${UI_PASSWORD:?Set UI_PASSWORD}
+
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+
+    command:
+      - "--config"
+      - "/app/config.yaml"
+      - "--port"
+      - "4000"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+
+## PostgresSQL
+  postgres:
+    image: postgres:16
+
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set .env POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
