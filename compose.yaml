@@ -1,54 +1,89 @@
 name: litellm-manual-lab
 
 services:
-## litellm
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+
+    environment:
+      # PostgreSQL 관리자
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+
+      # 초기화 스크립트에서 사용할 앱 계정 비밀번호
+      LITELLM_DB_PASSWORD: ${LITELLM_DB_PASSWORD:?Set LITELLM_DB_PASSWORD}
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    configs:
+      - source: postgres_init
+        target: /docker-entrypoint-initdb.d/01-litellm.sh
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -h 127.0.0.1 -U postgres -d litellm
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
   litellm:
     image: docker.litellm.ai/berriai/litellm:main-stable
-    
+    restart: unless-stopped
+
     env_file:
       - .aws.env
 
     ports:
-      - "127.0.0.1:4000:4000"
-
-    environment:
-      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
-      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?Set LITELLM_MASTER_KEY}
-      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:?Set LITELLM_SALT_KEY}
-      UI_USERNAME: admin
-      UI_PASSWORD: ${UI_PASSWORD:?Set UI_PASSWORD}
+      - "4000:4000"
 
     volumes:
       - ./config.yaml:/app/config.yaml:ro
+      - ./guardrail_error_handler.py:/app/guardrail_error_handler.py:ro
 
     command:
-      - "--config"
-      - "/app/config.yaml"
-      - "--port"
-      - "4000"
+      - "--config=/app/config.yaml"
+      - "--port=4000"
+      - "--host=0.0.0.0"
+
+    environment:
+      DATABASE_URL: "postgresql://litellm:${LITELLM_DB_PASSWORD:?Set LITELLM_DB_PASSWORD}@postgres:5432/litellm?schema=public"
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?Set LITELLM_MASTER_KEY}
+      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:?Set LITELLM_SALT_KEY}
+      STORE_MODEL_IN_DB: "True"
+      UI_USERNAME: admin
+      UI_PASSWORD: ${UI_PASSWORD:?Set UI_PASSWORD}
+      AWS_GUARDRAIL_ID: ${AWS_GUARDRAIL_ID}
+      AWS_REGION: ${AWS_REGION}
+      AWS_ROLE_ARN: ${AWS_ROLE_ARN}
+      # 기존 AWS 관련 환경변수도 이곳에 추가
 
     depends_on:
       postgres:
         condition: service_healthy
 
+configs:
+  postgres_init:
+    content: |
+      #!/usr/bin/env bash
+      set -e
 
-## PostgresSQL
-  postgres:
-    image: postgres:16
+      psql --username "$$POSTGRES_USER" \
+           --dbname "$$POSTGRES_DB" \
+           --set=ON_ERROR_STOP=1 \
+           --set=app_password="$$LITELLM_DB_PASSWORD" <<'SQL'
+      CREATE USER litellm
+        WITH LOGIN
+        PASSWORD :'app_password'
+        NOSUPERUSER
+        NOCREATEDB
+        NOCREATEROLE;
 
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set .env POSTGRES_PASSWORD}
-      POSTGRES_DB: postgres
-
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+      CREATE DATABASE litellm OWNER litellm;
+      SQL
 
 volumes:
   postgres_data:

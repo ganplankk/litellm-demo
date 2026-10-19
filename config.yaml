@@ -8,12 +8,85 @@ model_list:
     litellm_params:
       model: bedrock/global.anthropic.claude-sonnet-5
       
-  - model_name: claude-sonnet
+  - model_name: claude-sonnet-4-6
     litellm_params:
       model: bedrock/global.anthropic.claude-sonnet-4-6
+      fallbacks:
+        - "blocked-guardrail-response"
 
+
+guardrails:
+  # AWS에 생성한 정책으로 입력 검사·마스킹
+  - guardrail_name: aws-bedrock-guardrail
+    litellm_params:
+      guardrail: bedrock
+      mode: pre_call
+
+      guardrailIdentifier: os.environ/AWS_GUARDRAIL_ID
+      guardrailVersion: "DRAFT"
+      aws_region_name: os.environ/AWS_REGION
+
+      mask_request_content: true
+
+  # AWS에 생성한 정책으로 응답 검사·마스킹·grounding
+  - guardrail_name: aws-bedrock-grounding
+    litellm_params:
+      guardrail: bedrock
+      mode: post_call
+
+      guardrailIdentifier: os.environ/AWS_GUARDRAIL_ID
+      guardrailVersion: "DRAFT"
+      aws_region_name: os.environ/AWS_REGION
+
+      mask_response_content: true
+      contextual_grounding_from_messages: true
+
+      # 응답 전체를 검사한 뒤 클라이언트에 전달
+      streaming_buffer_until_moderated: true
+      streaming_end_of_stream_only: true
+
+  # 정책 ID 없이 검사 항목을 직접 지정하는 별도 가드레일
+  - guardrail_name: aws-bedrock-checks
+    litellm_params:
+      guardrail: bedrock
+      mode: pre_call
+
+      # checks API 지원 리전: 도쿄
+      aws_region_name: ap-northeast-1
+      aws_role_name: os.environ/AWS_ROLE_ARN
+
+      checks:
+        contentFilter:
+          categories:
+            - category: VIOLENCE
+            - category: HATE
+            - category: SEXUAL
+            - category: MISCONDUCT
+            - category: INSULTS
+
+        promptAttack:
+          categories:
+            - category: JAILBREAK
+            - category: PROMPT_INJECTION
+            - category: PROMPT_LEAKAGE
+
+        sensitiveInformation:
+          entities:
+            - type: EMAIL
+            - type: PHONE
+            - type: CREDIT_DEBIT_CARD_NUMBER
+            - type: AWS_ACCESS_KEY
+            - type: AWS_SECRET_KEY
+
+      content_filter_threshold: 0.1
+      prompt_attack_threshold: 0.5
+      pii_confidence_threshold: 0.7
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
   store_model_in_db: true
   #disable_env_credential_login: true
+
+litellm_settings:
+  callbacks:
+    - guardrail_error_handler.handler
