@@ -2,36 +2,79 @@ from fastapi import HTTPException
 from litellm.integrations.custom_logger import CustomLogger
 
 
+MESSAGES = {
+    "입력 내용이 보안 정책에 따라 차단되었습니다."
+}
+
+
 class GuardrailErrorHandler(CustomLogger):
     async def async_post_call_failure_hook(
-        self,
-        request_data,
-        original_exception,
-        user_api_key_dict,
-        traceback_str=None,
+        self, request_data, original_exception,
+        user_api_key_dict, traceback_str=None,
     ):
         detail = getattr(original_exception, "detail", None)
 
-        is_bedrock_block = (
-            getattr(original_exception, "status_code", None) == 400
-            and isinstance(detail, dict)
-            and detail.get("error") == "Violated guardrail policy"
-            and (
-                "bedrock_guardrail_checks" in detail
-                or "bedrock_guardrail_response" in detail
-            )
-        )
+        if (
+            getattr(original_exception, "status_code", None) != 400
+            or not isinstance(detail, dict)
+            or detail.get("error") != "Violated guardrail policy"
+        ):
+            return None
 
-        if is_bedrock_block:
-            return HTTPException(
-                status_code=400,
-                detail=(
-                    "서비스 보안 정책에 따라 요청이 차단되었습니다. "
-                    "개인정보나 민감한 내용을 제거한 후 다시 요청해 주세요."
-                ),
-            )
+        name = detail.get("guardrail_name")
 
-        return None
+        # 지정한 가드레일의 차단 메시지만 변경한다.
+        if name not in MESSAGES:
+            return None
+
+        checks = {
+            v.get("check")
+            for v in detail.get("bedrock_guardrail_checks", [])
+            if isinstance(v, dict)
+        }
+        policies = {
+            a.get("policy")
+            for a in detail.get("assessments", [])
+            if isinstance(a, dict)
+        }
+        types = {
+            m.get("type")
+            for a in detail.get("assessments", [])
+            if isinstance(a, dict)
+            for m in a.get("matches", [])
+            if isinstance(m, dict) and m.get("action") == "BLOCKED"
+        }
+
+        message = MESSAGES[name]
+        print("[guardrail-result]", {
+            "http_status": getattr(original_exception, "status_code", None),
+            "guardrail_name": name,
+            "checks": list(checks),
+            "policies": list(policies),
+            "types": list(types),
+            "detail": list(detail),
+        }, flush=True)
+
+        if "sensitiveInformation" in checks or \
+                "sensitiveInformationPolicy" in policies:
+            message = "개인정보나 인증정보를 제거한 후 다시 요청해 주세요."
+
+        elif "promptAttack" in checks or "PROMPT_ATTACK" in types:
+            message = "프롬프트 조작으로 판단되는 요청이 차단되었습니다."
+
+        elif "contextualGroundingPolicy" in policies:
+            message = "참고 자료에서 응답의 근거를 확인할 수 없습니다."
+
+        elif "HATE" in types:
+            message = "혐오발언이 감지되어 요청이 차단되었습니다."
+
+        elif "contentFilter" in checks or "contentPolicy" in policies:
+            message = "유해한 내용이 감지되어 요청이 차단되었습니다."
+
+        elif "topicPolicy" in policies:
+            message = "주민등록번호가 포함되어있습니다. 개인정보를 제거한 후 다시 요청해 주세요."
+
+        return HTTPException(status_code=400, detail=message)
 
 
 handler = GuardrailErrorHandler()

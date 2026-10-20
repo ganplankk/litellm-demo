@@ -85,7 +85,13 @@ guardrails:
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
   store_model_in_db: true
+  proxy_config_reload_interval_seconds: 30 #  default: 30초마다 config.yaml 변경 감지 후 재적용
+  database_connection_pool_limit: 10 # connection pooling 10개 제한
   #disable_env_credential_login: true
+  
+  # ALB 등 프록시 뒤에서 실행할 때, 클라이언트 IP를 올바르게 인식하도록 설정
+  trusted_proxy_ranges: ["10.0.0.0/8"] 
+  use_x_forwarded_for: true
 
 litellm_settings:
   callbacks:
