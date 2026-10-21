@@ -1,9 +1,9 @@
 from fastapi import HTTPException
 from litellm.integrations.custom_logger import CustomLogger
-
+import os
 
 MESSAGES = {
-    "입력 내용이 보안 정책에 따라 차단되었습니다."
+    "aws-bedrock-guardrail": "입력 내용이 보안 정책에 따라 차단되었습니다."
 }
 
 
@@ -68,6 +68,12 @@ class GuardrailErrorHandler(CustomLogger):
         elif "HATE" in types:
             message = "혐오발언이 감지되어 요청이 차단되었습니다."
 
+        elif "MISCONDUCT" in types:
+            message = "주민등록번호 포함안됩니다."
+
+        elif "PROFANITY" in types:
+            message = "주민등록번호 포함안됩니다."
+
         elif "contentFilter" in checks or "contentPolicy" in policies:
             message = "유해한 내용이 감지되어 요청이 차단되었습니다."
 
@@ -77,4 +83,8 @@ class GuardrailErrorHandler(CustomLogger):
         return HTTPException(status_code=400, detail=message)
 
 
-handler = GuardrailErrorHandler()
+handler = GuardrailErrorHandler(
+    s3_bucket_name="s3-litellm-hsbang",
+    s3_region_name=os.getenv("AWS_REGION", "us-east-1"),
+    s3_path="litellm/request-logs"
+)

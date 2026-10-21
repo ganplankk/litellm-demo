@@ -2,7 +2,7 @@ model_list:
   - model_name: APAC-claude-3-sonnect
     litellm_params:
       model: bedrock/global.anthropic.claude-haiku-5-5
-      aws_region_name: ap-northeast-2
+      aws_region_name: os.environ/AWS_REGION
 
   - model_name: claude-sonnet-5
     litellm_params:
@@ -11,8 +11,6 @@ model_list:
   - model_name: claude-sonnet-4-6
     litellm_params:
       model: bedrock/global.anthropic.claude-sonnet-4-6
-      fallbacks:
-        - "blocked-guardrail-response"
 
 
 guardrails:
@@ -25,7 +23,8 @@ guardrails:
       guardrailIdentifier: os.environ/AWS_GUARDRAIL_ID
       guardrailVersion: "DRAFT"
       aws_region_name: os.environ/AWS_REGION
-
+      
+      default_on: true
       mask_request_content: true
 
   # AWS에 생성한 정책으로 응답 검사·마스킹·grounding
@@ -51,8 +50,8 @@ guardrails:
       guardrail: bedrock
       mode: pre_call
 
-      # checks API 지원 리전: 도쿄
-      aws_region_name: ap-northeast-1
+      # checks API 지원 리전 서울 미지원
+      aws_region_name: os.environ/AWS_REGION
       aws_role_name: os.environ/AWS_ROLE_ARN
 
       checks:
@@ -90,9 +89,36 @@ general_settings:
   #disable_env_credential_login: true
   
   # ALB 등 프록시 뒤에서 실행할 때, 클라이언트 IP를 올바르게 인식하도록 설정
-  trusted_proxy_ranges: ["10.0.0.0/8"] 
+  trusted_proxy_ranges: ["0.0.0.0/0"] 
   use_x_forwarded_for: true
 
 litellm_settings:
+## AWS Bedrock Guardrail 관련 설정
   callbacks:
     - guardrail_error_handler.handler
+    - s3_access_logger_handler.handler
+    - websearch_interception
+
+## websearch_interception_params는 litellm_settings 최상위 위치에 있어야 함
+  websearch_interception_params:
+    enabled_providers:
+      - bedrock
+    search_tool_name: tavily-search
+
+# model_list, litellm_settings와 같은 최상위 위치
+search_tools:
+  - search_tool_name: tavily-search
+    litellm_params:
+      search_provider: tavily
+      api_key: os.environ/TAVILY_API_KEY
+
+
+## s3 succecss callback 설정 예시
+  # success_callback: ["s3_v2"]
+  
+  # turn_off_message_logging: true # 질문·답변 본문을 로깅 대상에서 제외
+
+  # s3_callback_params:
+  #   s3_bucket_name: "s3-litellm-hsbang"
+  #   s3_region_name: "os.environ/AWS_REGION"
+  #   s3_path: "litellm/request-logs"
