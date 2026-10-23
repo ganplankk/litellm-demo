@@ -7,7 +7,7 @@
 금융권에서는 망 분리 규제 개선에 따라 관련 제도와 보안 요건을 충족하는 범위에서 외부 클라우드 및 생성형 AI 서비스의 활용이 확대되면서 LLM Gateway와 Amazon Bedrock 연동으로 개발 생산성 향상과 민감정보 필터링·접근 제어·감사 로그 등의 보안 통제를 구성하여 정보 유출 위험을 낮출 수 있습니다.
 
 ![*그림 1. 입력과 모델 출력을 독립적으로 평가하는 AWS ApplyGuardrail 개념도. 
-출처: [AWS 공식 블로그](https://aws.amazon.com/blogs/machine-learning/implement-model-independent-safety-measures-with-amazon-bedrock-guardrails/).*](image.png)
+출처: [AWS 공식 블로그](https://aws.amazon.com/blogs/machine-learning/implement-model-independent-safety-measures-with-amazon-bedrock-guardrails/).*](images/bedrock-flow.png)
 
 *그림 1. 입력과 모델 출력을 독립적으로 평가하는 AWS ApplyGuardrail 개념도. 
 출처: [AWS 공식 블로그](https://aws.amazon.com/blogs/machine-learning/implement-model-independent-safety-measures-with-amazon-bedrock-guardrails/).*
@@ -22,7 +22,7 @@ LiteLLM Proxy가 클라이언트 요청을 받아 가드레일 적용 후 LLM Pr
 처리되는 프로세스 구간마다 발생하는 이벤트를 Hook 이라고 하며 해당 Hook 마다 커스텀 할 수 있는 요소들을 LiteLLM 에서 제공하고 있다.
 
 ![*그림 2. 프로세스 흐름 개념도. 
-****출처**: [High Level architecture](https://docs.litellm.ai/docs/proxy/architecture)***](image%201.png)
+****출처**: [High Level architecture](https://docs.litellm.ai/docs/proxy/architecture)***](images/litellm-lifecycle.png)
 
 *그림 2. 프로세스 흐름 개념도. 
 ****출처**: [High Level architecture](https://docs.litellm.ai/docs/proxy/architecture)***
