@@ -1,5 +1,3 @@
-# LiteLLM 스터디
-
 ## 1. LiteLLM 이란?
 
 **LiteLLM**은 전 세계의 다양한 대형 언어 모델(LLM, Large Language Model)을 **OpenAI API 표준 규격**으로 통일하여 쉽게 호출하고 관리할 수 있도록 도와주는 오픈소스 LLM Proxy이며`chat/completions` (OpenAI API) 외 `/v1/messages` (ClaudSDK) 등 다양한 엔드포인트들도 지원하고 있습니다.
@@ -13,6 +11,7 @@
 
 *그림 1. 입력과 모델 출력을 독립적으로 평가하는 AWS ApplyGuardrail 개념도. 
 출처: [AWS 공식 블로그](https://aws.amazon.com/blogs/machine-learning/implement-model-independent-safety-measures-with-amazon-bedrock-guardrails/).*
+
 
 ## 2. LifeCycle
 
@@ -336,7 +335,7 @@ LiteLLM은 여러 모델의 요청이 통과하는 게이트웨이에서 이러�
     ```yaml
     
     guardrails:
-      - guardrail_name: aws-bedrock-guardrail
+    <u></u>  - guardrail_name: aws-bedrock-guardrail
         litellm_params:
           guardrail: bedrock
           mode: pre_call
@@ -361,145 +360,5 @@ LiteLLM은 여러 모델의 요청이 통과하는 게이트웨이에서 이러�
     |       ◦ `aws_role_name` | AssumeRole 대상 IAM Role ARN. |
     |       ◦ `mask_request_content` | 요청 프롬프트에 정규표현식패턴(개인정보 등) 탐지 시 마스킹 처리 |
 
-## 4. 차단 메시지 커스텀
 
-`async_post_call_failure_hook`  HOOK 
-
-- **실행 시점 :** LLM 모델을 향해 API 요청을 보낸 이후(Post-call)에, 통신 실패나 에러(예: 타임아웃, API 제한 초과, 서버 오류 등)로 인해 **요청이 최종 실패했을 때(`failure`)** 자동으로 호출됩니다.
-- **비동기(Async) 지원:** `async def`로 정의되어 있어, 메인 요청 흐름을 차단(Blocking)하지 않고 비동기 방식으로 에러 로그를 수집하거나 후속 처리를 수행할 수 있습니다.
-
-`contentPolicy`에는 여러 유형이 들어올 수 있으므로, 실제 차단된 `assessments[].matches[].type`을 집합으로 모아서 구분하며 값에 따라 에러 메시지를 분기시킬 수 있다.
-
-```python
-class GuardrailErrorHandler(CustomLogger):
-    async def async_post_call_failure_hook(
-        self, request_data, original_exception,
-        user_api_key_dict, traceback_str=None,
-    ):
-        detail = getattr(original_exception, "detail", None)
-  .....
-  policies = {
-      a.get("policy")
-      for a in detail.get("assessments", [])
-      if isinstance(a, dict)
-  }
-  
- .....
-  if "sensitiveInformation" in checks or \
-          "sensitiveInformationPolicy" in policies:
-      message = "개인정보나 인증정보를 제거한 후 다시 요청해 주세요."
-# 기존 if/elif 체인의 핵심 분기 발췌
-	elif "promptAttack" in checks or "PROMPT_ATTACK" in types:
-	    message = "프롬프트 조작으로 판단되는 요청이 차단되었습니다."
-	
-	elif "HATE" in types:
-	    message = "혐오발언이 감지되어 요청이 차단되었습니다."
-```
-
-현재 베드락으로 응답받는 내용은 FastAP의 `HTTPException()` 함수를 통해 차단메시지를 구분해서 커스텀한다. `HTTPException(status_code=400, detail=message)` 는 `CustomLogger` 클래스의 `original_exception` 특성에 Dict 타입으로 담겨서 해당 특성에 담겨있는 차단 원인을 활용해 분기처리 할 수 있다.  
-
- `HTTPException(status_code=400, detail=message)`를 반환하면 클라이언트 오류가 바뀌고, `None`을 반환하면 원래 오류를 유지합니다. 따라서 연결 실패 등 HTTP 500은 이 조건에서 변환하지 않습니다. [LiteLLM 오류 응답 변환](https://docs.litellm.ai/docs/proxy/call_hooks#advanced---transform-error-responses)
-
-> 현재 코드 메모: `MISCONDUCT`, `PROFANITY`, `topicPolicy`에 주민등록번호 관련 문구가 연결돼 있습니다. 이는 이 실습의 사용자 정의 메시지이며, 해당 유형이 주민등록번호 검출을 뜻한다는 근거가 되지는 않습니다. 또 `checks`·`policies`는 `types`와 달리 `BLOCKED` 필터가 없습니다.
-> 
-
-## 5. S3에 필요한 로그 필드만 전달하기
-
-`s3_access_logger_handler.py`는 내장 `S3Logger`를 상속하고 **성공 이벤트**를 재정의합니다. `standard_logging_object`에서 필요한 필드를 골라 상위 로거에 전달하는 부분이 핵심입니다.
-
-```python
-payload = kwargs.get("standard_logging_object")
-if not payload:
-    return
-
-metadata = payload.get("metadata") or {}
-selected = {key: payload.get(key) for key in FIELDS}
-selected["metadata"] = {
-    key: metadata.get(key) for key in IDENTITY_FIELDS
-}
-
-# 실제 파일은 IP 관련 두 필드도 추가한 뒤 전달한다.
-await super().async_log_success_event(
-    kwargs={**kwargs, "standard_logging_object": selected},
-    response_obj=response_obj,
-    start_time=start_time,
-    end_time=end_time,
-)
-```
-
-| 구분 | 선택 필드 |
-| --- | --- |
-| 호출 | `id`, `startTime`, `endTime`, `model`, `status` |
-| 사용량·비용 | `prompt_tokens`, `completion_tokens`, `total_tokens`, `response_cost` |
-| 사용자·팀 | `metadata.user_api_key_user_id`, `metadata.user_api_key_team_id`, `metadata.user_api_key_alias` |
-| 주소 | `requester_ip_address`, `request.client.host` |
-
-내장 `s3_v2`는 `kwargs["standard_logging_object"]`를 저장 대상으로 읽습니다. 이 객체를 필터한 값으로 교체하는 것이 중요합니다. [LiteLLM 공식 s3_v2 소스](https://github.com/BerriAI/litellm/blob/main/litellm/integrations/s3_v2.py)
-
-현재 저장 prefix는 `litellm/request-logs`, 리전은 `os.getenv("AWS_REGION", "us-east-1")`입니다. Python 코드에서는 이처럼 `os.getenv`로 값을 읽습니다.
-
-**필터 범위는 재정의한 성공 로그 경로입니다.** 실패 로그나 다른 출력까지 동일하게 필터된다고 보장하지 않습니다. IP 값은 기존 payload/metadata에서 읽으므로 값이 없으면 `None`이 됩니다. 현재 코드는 선택한 로그를 stdout에도 출력합니다.
-
-## 6. 인터넷 검색이 동작하는 순서
-
-```mermaid
-sequenceDiagram
-    participant U as 클라이언트
-    participant L as LiteLLM
-    participant B as Bedrock Claude
-    participant T as Tavily
-    U->>L: 질문 + 검색 tools
-    L->>B: 질문 + 도구 정의
-    B-->>L: tool_use + 검색어
-    L->>T: 검색 요청
-    T-->>L: 검색 결과
-    L->>B: tool_result 전달
-    B-->>L: 결과를 반영한 답변
-    L-->>U: 최종 응답
-```
-
-*그림 2. 현재 검색 설정을 설명하기 위해 작성한 순서도. 검색 도구가 실제 호출된 경우의 흐름이며, 가드레일·로그 처리는 생략했습니다.*
-
-`websearch_interception`은 모델이 요청한 검색을 Tavily로 실행하고 결과를 모델에 다시 전달합니다. 콜백을 등록해도 요청에 검색 도구가 없으면 이 흐름은 시작되지 않습니다. [LiteLLM 웹 검색 공식 문서](https://docs.litellm.ai/docs/integrations/websearch_interception)
-
-`/v1/messages`용 요청 예시입니다. `LITELLM_KEY`는 해당 모델·검색 도구를 사용할 수 있는 프록시 키를 사용합니다.
-
-```bash
-curl http://localhost:4000/v1/messages \
-  -H "Authorization: Bearer $LITELLM_KEY" \
-  -H "anthropic-version: 2023-06-01" \
-  -H "content-type: application/json" \
-  -d '{
-    "model": "claude-sonnet-4-6",
-    "max_tokens": 1000,
-    "messages": [
-      {"role": "user", "content": "서울의 오늘 날씨를 검색하고 출처 URL을 알려줘."}
-    ],
-    "tools": [
-      {"type": "web_search_20250305", "name": "web_search"}
-    ]
-  }'
-```
-
-이 예시는 Anthropic Messages 형식입니다. `/v1/chat/completions`에서는 `litellm_web_search` 함수 도구 형식을 사용합니다. 실제 검색 여부는 도구 실행이나 Tavily 호출 로그로 확인합니다.
-
-## 7. 자주 겪은 오류와 확인 지점
-
-| 증상 | 확인할 부분 |
-| --- | --- |
-| `ModuleNotFoundError: s3_access_logger_handler` | 콜백 파일명·최상위 `handler`·Compose 마운트를 확인하고 컨테이너 재생성 |
-| `bedrock-runtime.admin.amazonaws.com` 연결 실패 | 리전 자리에 `admin`이 들어간 주소. 컨테이너 환경변수와 UI/개별 요청의 리전 설정 확인 |
-| 모델이 “인터넷 기능이 없다”고 답함 | 요청의 검색 `tools` 포함 여부와 실제 도구 호출 확인 |
-| grounding/checks 메시지가 한국어로 바뀌지 않음 | 현재 `MESSAGES`에 입력 가드레일만 등록돼 있음 |
-
-아래는 기존 README에 있던 **과거 실습 결과 화면**입니다. HTTP 400 가드레일 차단 사례를 보여주며, 현재 한국어 변환 코드의 재검증 결과는 아닙니다.
-
-[기존 실습의 LiteLLM Playground 가드레일 차단 화면](https://github.com/user-attachments/assets/2e9cb427-4996-4491-ab6c-48450104aab2)
-
-기존 실습의 LiteLLM Playground 가드레일 차단 화면
-
-*그림 3. 저장소의 기존 README 첨부 이미지. 출처: 프로젝트 실습 기록.*
-
-이 문서는 현재 파일과 공식 자료의 대응 관계를 정리한 것입니다. `main-stable` 이미지 태그와 공식 소스의 `main`은 변경될 수 있으므로 재현이 필요할 때는 사용한 이미지 버전 또는 digest를 함께 기록합니다.
-
-![image.png](image%202.png)
+...
