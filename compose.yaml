@@ -42,14 +42,15 @@ services:
 
     volumes:
       - ./config.yaml:/app/config.yaml:ro
-      - ./guardrail_error_handler.py:/app/guardrail_error_handler.py:ro
+      - ./my_bedrockguardrail.py:/app/my_bedrockguardrail.py:ro
       - ./s3_access_logger_handler.py:/app/s3_access_logger_handler.py:ro
+      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
 
     command:
       - "--config=/app/config.yaml"
       - "--port=4000"
       - "--host=0.0.0.0"
-      # - "--num_workers=4" # 워커 수를 환경변수로 설정 가능 (기본값: 3), vCPU 개수랑 맞춰줘야 함
+      # - "--num_workers=4" # vCPU 개수랑 맞춰줘야 함, gunicorn 기본값은 1개 
       - "--keepalive_timeout=75"
 
     environment:
@@ -62,8 +63,9 @@ services:
       AWS_GUARDRAIL_ID: ${AWS_GUARDRAIL_ID}
       AWS_REGION: ${AWS_REGION}
       AWS_ROLE_ARN: ${AWS_ROLE_ARN}
+      AWS_MODEL_ID: ${AWS_MODEL_ID}
       TAVILY_API_KEY: ${TAVILY_API_KEY}
-      # 기존 AWS 관련 환경변수도 이곳에 추가 
+      SSL_CERT_FILE: ${SSL_CERT_FILE}
 
     depends_on:
       postgres:

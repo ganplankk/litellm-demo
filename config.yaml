@@ -7,17 +7,19 @@ model_list:
   - model_name: claude-sonnet-5
     litellm_params:
       model: bedrock/global.anthropic.claude-sonnet-5
-      
+      aws_region_name: os.environ/AWS_REGION
+  
   - model_name: claude-sonnet-4-6
     litellm_params:
       model: bedrock/global.anthropic.claude-sonnet-4-6
-
+      model_id: os.environ/AWS_MODEL_ID # AWS베드락 추론프로파일 ARN
+      aws_region_name: os.environ/AWS_REGION
 
 guardrails:
   # AWS에 생성한 정책으로 입력 검사·마스킹
   - guardrail_name: aws-bedrock-guardrail
     litellm_params:
-      guardrail: bedrock
+      guardrail: my_bedrockguardrail.my_bedrockguardrail
       mode: pre_call
 
       guardrailIdentifier: os.environ/AWS_GUARDRAIL_ID
@@ -37,14 +39,14 @@ guardrails:
       guardrailVersion: "DRAFT"
       aws_region_name: os.environ/AWS_REGION
 
-      mask_response_content: true
+      mask_response_content: true 
       contextual_grounding_from_messages: true
 
       # 응답 전체를 검사한 뒤 클라이언트에 전달
       streaming_buffer_until_moderated: true
       streaming_end_of_stream_only: true
 
-  # 정책 ID 없이 검사 항목을 직접 지정하는 별도 가드레일
+  # 정책 ID 없이 검사 항목을 직접 지정하는 별도 가드레일, AWS가드레일 정책 설정없이 코드래벨에서 정책 정의 가능
   - guardrail_name: aws-bedrock-checks
     litellm_params:
       guardrail: bedrock
@@ -88,24 +90,22 @@ general_settings:
   database_connection_pool_limit: 10 # connection pooling 10개 제한
   #disable_env_credential_login: true
   
-  # ALB 등 프록시 뒤에서 실행할 때, 클라이언트 IP를 올바르게 인식하도록 설정
+  # 상단 ALB 구성 시 ALB 서브넷 대역 설정
   trusted_proxy_ranges: ["0.0.0.0/0"] 
   use_x_forwarded_for: true
 
 litellm_settings:
-## AWS Bedrock Guardrail 관련 설정
   callbacks:
-    - guardrail_error_handler.handler
     - s3_access_logger_handler.handler
     - websearch_interception
 
-## websearch_interception_params는 litellm_settings 최상위 위치에 있어야 함
+## 인터넷 검색도구 호출설정 (Tool : tavily-search / 매달 1000토큰 무료)
   websearch_interception_params:
     enabled_providers:
       - bedrock
     search_tool_name: tavily-search
 
-# model_list, litellm_settings와 같은 최상위 위치
+# travily-search tool 설정
 search_tools:
   - search_tool_name: tavily-search
     litellm_params:
