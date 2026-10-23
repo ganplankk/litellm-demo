@@ -105,7 +105,7 @@ litellm_settings:
       - bedrock
     search_tool_name: tavily-search
 
-# travily-search tool 설정
+# tavily-search tool 설정
 search_tools:
   - search_tool_name: tavily-search
     litellm_params:
