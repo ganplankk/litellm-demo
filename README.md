@@ -14,10 +14,9 @@
 *그림 1. 입력과 모델 출력을 독립적으로 평가하는 AWS ApplyGuardrail 개념도. 
 출처: [AWS 공식 블로그](https://aws.amazon.com/blogs/machine-learning/implement-model-independent-safety-measures-with-amazon-bedrock-guardrails/).*
 
+---
 
 ## 2. LifeCycle
-
----
 
 LiteLLM Proxy가 클라이언트의 요청을 받아 가드레일을 적용한 뒤 LLM Provider에게 전달하고, 그에 대한 응답이나 실패를 처리하는 전체 프로세스에 대한 설명입니다.
 
@@ -30,8 +29,6 @@ LiteLLM은 이 처리 과정(구간)마다 발생하는 이벤트에 훅(Hook)�
 ****출처**: [High Level architecture](https://docs.litellm.ai/docs/proxy/architecture)***
 
 ### 2.1. 단계별 상세 설명
-
----
 
 라이프사이클의 세부 처리 단계를 플로우별로 나누어, 각 단계별 중요 호출과 훅(Hook)을 설명합니다.
 
@@ -200,9 +197,9 @@ Proxy는 [6]의 Moderation 작업과 [7]~[17]의 LLM 호출 작업을 각각 tas
 - LiteLLM 내장 기능도 이 Hook으로 동작합니다. `_ProxyDBLogger`가 키·사용자·팀 spend를 DB에 반영하고, Rate Limiter가 TPM 사용량을 갱신하며, Langfuse·OTEL 같은 연동도 여기서 전송됩니다.
 - 응답이 이미 나간 뒤라 응답을 바꿀 수 없고, 여기서 난 예외는 요청 결과에 영향을 주지 않습니다.
 
-## 3. 설정정보
-
 ---
+
+## 3. 설정정보
 
 LiteLLM-demo 구성항목
 
@@ -230,11 +227,9 @@ environment:
   TAVILY_API_KEY: ${TAVILY_API_KEY}
 ```
 
-## 3. Config.yaml
+## 4. Config.yaml
 
----
-
-### 3.1. 모델·콜백·검색 Tool
+### 4.1. 모델·콜백·검색 Tool
 
 ```yaml
 # config.yaml 핵심 발췌
@@ -279,7 +274,7 @@ search_tools:
 |               • `search_provider`  | Tool provider 작성 |
 |               • `api_key`  | Provider 가 발급해준 key 입력  |
 
-### 3.2. 공통 설정
+### 4.2. 공통 설정
 
 ```yaml
 # config.yaml 핵심 발췌
@@ -301,7 +296,7 @@ general_settings:
 | • `store_model_in_db` | 연동 DB에 Config 파일 및 상태정보 저장 여부 |
 | • `proxy_config_reload_interval_seconds` | proxy config 동기화 간격 정보 |
 
-### 3.3. 가드레일
+### 4.3. 가드레일
 
 가드레일은 사용자의 입력 프롬프트 및 LLM의 생성 응답을 실시간으로 감시하여, 프롬프트 인젝션 등의 악성 공격과 민감정보 유출, 혐오·모욕·성적 표현 등 부적절한 콘텐츠를 전·후처리 단계에서 차단하거나 마스킹하는 보안 정책입니다.
 
@@ -362,5 +357,4 @@ LiteLLM은 여러 모델의 요청이 통과하는 게이트웨이에서 이러�
     |       ◦ `aws_role_name` | AssumeRole 대상 IAM Role ARN. |
     |       ◦ `mask_request_content` | 요청 프롬프트에 정규표현식패턴(개인정보 등) 탐지 시 마스킹 처리 |
 
-
-...
+---
