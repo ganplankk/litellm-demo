@@ -95,15 +95,18 @@ general_settings:
   use_x_forwarded_for: true
 
 litellm_settings:
+  skip_system_message_in_guardrail: true
   callbacks:
     - s3_access_logger_handler.handler
-    - websearch_interception
+    # - websearch_interception
+    - websearch_tool_choice_handler.handler
 
 ## 인터넷 검색도구 호출설정 (Tool : tavily-search / 매달 1000토큰 무료)
   websearch_interception_params:
     enabled_providers:
       - bedrock
     search_tool_name: tavily-search
+    max_agentic_loops: 10
 
 # tavily-search tool 설정
 search_tools:
@@ -111,6 +114,13 @@ search_tools:
     litellm_params:
       search_provider: tavily
       api_key: os.environ/TAVILY_API_KEY
+
+# mcp_servers:
+#   tavily:
+#     url: https://mcp.tavily.com/mcp/
+#     transport: http
+#     auth_type: bearer_token
+#     auth_value: os.environ/TAVILY_API_KEY
 
 
 ## s3 succecss callback 설정 예시
@@ -122,3 +132,5 @@ search_tools:
   #   s3_bucket_name: "s3-litellm-hsbang"
   #   s3_region_name: "os.environ/AWS_REGION"
   #   s3_path: "litellm/request-logs"
+
+

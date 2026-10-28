@@ -31,7 +31,7 @@ services:
       start_period: 10s
 
   litellm:
-    image: docker.litellm.ai/berriai/litellm:main-stable
+    image: docker.litellm.ai/berriai/litellm:1.103.3
     restart: unless-stopped
 
     env_file:
@@ -44,6 +44,7 @@ services:
       - ./config.yaml:/app/config.yaml:ro
       - ./my_bedrockguardrail.py:/app/my_bedrockguardrail.py:ro
       - ./s3_access_logger_handler.py:/app/s3_access_logger_handler.py:ro
+      - ./websearch_tool_choice_handler.py:/app/websearch_tool_choice_handler.py:ro
       - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
 
     command:
